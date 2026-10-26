@@ -1,0 +1,8 @@
+{
+  "Id": "SpellSequencers",
+  "DisplayName": "Spell Sequencers (BG2-style)",
+  "Author": "KSPdevil",
+  "Version": "1.0.0",
+  "AssemblyName": "SpellSequencers.dll",
+  "EntryMethod": "SpellSequencers.Main.Load"
+}
