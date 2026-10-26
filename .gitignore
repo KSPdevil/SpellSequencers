@@ -1,0 +1,4 @@
+# 构建产物（由 build.ps1 生成，不纳入仓库）
+SpellSequencers.dll
+SpellSequencers-UMM.zip
+SpellSequencers.log
