@@ -1,0 +1,33 @@
+{
+  "AssetId": "__GUID__",
+  "Data": {
+    "$type": "618a7e0d54149064ab3ffa5d9057362c, BlueprintBuff",
+    "PrototypeLink": null,
+    "m_Overrides": [],
+    "Components": [],
+    "Comment": "",
+    "m_DisplayName": {
+      "m_Key": "__NAMEKEY__",
+      "m_OwnerString": "__GUID__",
+      "m_OwnerPropertyPath": "m_DisplayName",
+      "m_JsonPath": "",
+      "Shared": null
+    },
+    "m_Description": {
+      "m_Key": "__DESCKEY__",
+      "m_OwnerString": "__GUID__",
+      "m_OwnerPropertyPath": "m_Description",
+      "m_JsonPath": "",
+      "Shared": null
+    },
+    "m_Icon": { "guid": "__ICON__", "fileid": 21300000 },
+    "IsClassFeature": false,
+    "m_Flags": 1,
+    "Stacking": "Rank",
+    "Ranks": 3,
+    "TickEachSecond": false,
+    "Frequency": "Rounds",
+    "ResourceAssetIds": [],
+    "EmulateAbilityContext": false
+  }
+}
