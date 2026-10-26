@@ -1,0 +1,172 @@
+{
+  "AssetId": "__GUID__",
+  "Data": {
+    "$type": "da11db195c86e0d4dae17a2c03a4ba9a, BlueprintAbility",
+    "PrototypeLink": null,
+    "m_Overrides": [],
+    "Components": [
+      {
+        "$type": "bbf7e743804d40a47bde0b27174f33a9, SpellComponent",
+        "m_Flags": 0,
+        "name": "$SpellComponent$11111111-1111-4111-8111-111111111111",
+        "PrototypeLink": { "guid": null, "name": null },
+        "m_Overrides": [],
+        "School": "Transmutation"
+      },
+      {
+        "$type": "317417736594fa843918ddbcfeb74a76, SpellListComponent",
+        "m_Flags": 0,
+        "name": "$SpellListComponent$a1111111-1111-4111-8111-111111111111",
+        "PrototypeLink": { "guid": null, "name": null },
+        "m_Overrides": [],
+        "m_SpellList": "!bp_ba0401fdeb4062f40a7aa95b6f07fe89",
+        "SpellLevel": __LEVEL__
+      },
+      {
+        "$type": "317417736594fa843918ddbcfeb74a76, SpellListComponent",
+        "m_Flags": 0,
+        "name": "$SpellListComponent$b2222222-2222-4222-8222-222222222222",
+        "PrototypeLink": { "guid": null, "name": null },
+        "m_Overrides": [],
+        "m_SpellList": "!bp_8443ce803d2d31347897a3d85cc32f53",
+        "SpellLevel": __LEVEL__
+      },
+      {
+        "$type": "317417736594fa843918ddbcfeb74a76, SpellListComponent",
+        "m_Flags": 0,
+        "name": "$SpellListComponent$c3333333-3333-4333-8333-333333333333",
+        "PrototypeLink": { "guid": null, "name": null },
+        "m_Overrides": [],
+        "m_SpellList": "!bp_bad8638d40639d04fa2f80a1cac67d6b",
+        "SpellLevel": __LEVEL__
+      },
+      {
+        "$type": "66e032e5cf38801428940a1a0d14b946, AbilityEffectRunAction",
+        "m_Flags": 0,
+        "name": "$AbilityEffectRunAction$22222222-2222-4222-8222-222222222222",
+        "PrototypeLink": { "guid": "", "name": "" },
+        "m_Overrides": [],
+        "SavingThrowType": "Unknown",
+        "Actions": {
+          "Actions": [
+            {
+              "$type": "5d13a597de91e4746b804f8233518523, ContextActionApplyBuff",
+              "name": "$ContextActionApplyBuff$33333333-3333-4333-8333-333333333333",
+              "m_Buff": "!bp___BUFFGUID__",
+              "Permanent": false,
+              "UseDurationSeconds": false,
+              "DurationValue": {
+                "Rate": "Days",
+                "DiceType": "Zero",
+                "DiceCountValue": {
+                  "ValueType": "Simple",
+                  "Value": 0,
+                  "ValueRank": "Default",
+                  "ValueShared": "Damage",
+                  "Property": "None",
+                  "m_CustomProperty": null,
+                  "m_AbilityParameter": "Level",
+                  "PropertyName": "Value1"
+                },
+                "BonusValue": {
+                  "ValueType": "Rank",
+                  "Value": 0,
+                  "ValueRank": "Default",
+                  "ValueShared": "Damage",
+                  "Property": "None",
+                  "m_CustomProperty": null,
+                  "m_AbilityParameter": "Level",
+                  "PropertyName": "Value1"
+                },
+                "m_IsExtendable": true
+              },
+              "DurationSeconds": 0.0,
+              "IsFromSpell": true,
+              "IsNotDispelable": true,
+              "ToCaster": true,
+              "AsChild": false,
+              "SameDuration": false,
+              "NotLinkToAreaEffect": false,
+              "IgnoreParentContext": false
+            }
+          ]
+        }
+      },
+      {
+        "$type": "faae7c00f379e66488a537d47a2919ad, CraftInfoComponent",
+        "m_Flags": 0,
+        "name": "$CraftInfoComponent$55555555-5555-4555-8555-555555555555",
+        "PrototypeLink": { "guid": null, "name": null },
+        "m_Overrides": [],
+        "SpellType": "Other",
+        "SavingThrow": "None",
+        "AOEType": "None"
+      }
+    ],
+    "Comment": "",
+    "m_AllowNonContextActions": false,
+    "m_DisplayName": {
+      "m_Key": "__NAMEKEY__",
+      "m_OwnerString": "__GUID__",
+      "m_OwnerPropertyPath": "m_DisplayName",
+      "m_JsonPath": "",
+      "Shared": null
+    },
+    "m_Description": {
+      "m_Key": "__DESCKEY__",
+      "m_OwnerString": "__GUID__",
+      "m_OwnerPropertyPath": "m_Description",
+      "m_JsonPath": "",
+      "Shared": null
+    },
+    "m_Icon": { "guid": "__ICON__", "fileid": 21300000 },
+    "m_DefaultAiAction": null,
+    "m_AutoUseIsForbidden": true,
+    "Type": "Spell",
+    "Range": "Personal",
+    "IgnoreMinimalRangeLimit": false,
+    "CustomRange": { "m_Value": 0.0 },
+    "ShowNameForVariant": false,
+    "OnlyForAllyCaster": false,
+    "CanTargetPoint": false,
+    "CanTargetEnemies": false,
+    "CanTargetFriends": false,
+    "CanTargetSelf": true,
+    "ShouldTurnToTarget": false,
+    "SpellResistance": false,
+    "IgnoreSpellResistanceForAlly": false,
+    "ActionBarAutoFillIgnored": false,
+    "Hidden": false,
+    "NeedEquipWeapons": false,
+    "UseCurrentWeaponAsReasonItem": false,
+    "NotOffensive": true,
+    "EffectOnAlly": "None",
+    "EffectOnEnemy": "None",
+    "m_Parent": null,
+    "Animation": "Touch",
+    "HasFastAnimation": false,
+    "AnimationStyle": "CastActionTouch",
+    "m_TargetMapObjects": false,
+    "ActionType": "Standard",
+    "MinimalTransitionOut": 0.0,
+    "AvailableMetamagic": "Quicken, Heighten, CompletelyNormal",
+    "m_IsFullRoundAction": false,
+    "LocalizedDuration": {
+      "m_Key": "__DURKEY__",
+      "m_OwnerString": "__GUID__",
+      "m_OwnerPropertyPath": "LocalizedDuration",
+      "m_JsonPath": "",
+      "Shared": null
+    },
+    "LocalizedSavingThrow": {
+      "m_Key": "__SAVEKEY__",
+      "m_OwnerString": "__GUID__",
+      "m_OwnerPropertyPath": "LocalizedSavingThrow",
+      "m_JsonPath": "",
+      "Shared": null
+    },
+    "MaterialComponent": { "m_Item": null, "Count": 1 },
+    "DisableLog": false,
+    "ResourceAssetIds": []
+  }
+}
