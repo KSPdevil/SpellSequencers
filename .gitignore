@@ -1,0 +1,18 @@
+# 构建产物（由 build.ps1 生成，不纳入仓库）
+SpellSequencers.dll
+SpellSequencers-UMM.zip
+
+# 运行时产物（游戏根目录或 Mods 目录）
+SpellSequencers.log
+SpellSequencers.debug
+debug.flag
+
+# 构建中间目录
+obj/
+bin/
+
+# IDE 配置
+.vscode/
+.idea/
+*.csproj
+*.sln
