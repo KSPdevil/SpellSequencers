@@ -7,6 +7,7 @@ using System.Text;
 using HarmonyLib;
 using Kingmaker;
 using Kingmaker.Blueprints;
+using Kingmaker.Controllers;
 using Kingmaker.Blueprints.Classes.Spells;
 using Kingmaker.Blueprints.JsonSystem;
 using Kingmaker.EntitySystem.Entities;
@@ -900,14 +901,19 @@ namespace SpellSequencers
                 // 全部选定 → 每个法术打各自的目标，倾泻后解除，并消耗一个标准动作
                 var fireSpells = new List<StoredSpell>(slotState.Spells);
                 var fireTargets = (TargetWrapper[])slotState.SlotTargets.Clone();
-                slotPart.States.Remove(slotState);
-                SyncUnit(caster, slotPart);
+                slotPart.States.Remove(slotState);   // 立即移除，避免同一帧内被再次吸收/触发
                 Main.Log("all slots targeted — firing " + fireSpells.Count + " spells from " + slotDef.Key);
                 for (int i = 0; i < fireSpells.Count; i++)
                 {
                     TryFire(caster, fireSpells[i], fireTargets[i] ?? (TargetWrapper)caster);
                 }
-                caster.SpendAction(UnitCommand.CommandType.Standard, false, 0f);
+                // 移除 buff/释放能力与扣动作推迟到下一帧：此刻仍在 RuleCastSpell 回调内，
+                // 同步改 AbilityCollection 会让行动条在施法未结束时重建并销毁变体弹窗。
+                Runner.DeferToNextFrame(delegate
+                {
+                    SyncUnit(caster, slotPart);
+                    caster.SpendAction(UnitCommand.CommandType.Standard, false, 0f);
+                });
                 rule.SetSuccess(true);
                 return false;
             }
@@ -972,6 +978,36 @@ namespace SpellSequencers
             return false;            // 但不产生任何法术效果
         }
 
+        private static readonly PropertyInfo s_RuleResultProp =
+            typeof(RuleCastSpell).GetProperty("Result", BindingFlags.Public | BindingFlags.Instance);
+        private static readonly MethodInfo s_RuleResultSetter = s_RuleResultProp?.GetSetMethod(true);
+        private static readonly FieldInfo s_RuleResultField =
+            typeof(RuleCastSpell).GetField("<Result>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance);
+
+        /// <summary>
+        /// 被拦截的施法不会执行原版 RuleCastSpell.OnTrigger，Result 会一直是 null；
+        /// 而 UnitUseAbility.OnAction 末尾会直接解引用它（2.7.0 无空检查），
+        /// 抛出的异常会被 UnitCommandController 捕获并 InterruptAll，打断施法与行动条收尾。
+        /// 这里补一个无害的执行过程（IsEngageUnit 为 false），让命令按正常成功结束。
+        /// 注意：必须放在 Handle 返回 false 之后调用，此时法术效果已由 TryFire 处理完毕。
+        /// </summary>
+        public static void FillInterceptedResult(RuleCastSpell rule)
+        {
+            if (rule == null || rule.Result != null) return;
+            try
+            {
+                var process = new AbilityExecutionProcess(rule.Context);
+                if (s_RuleResultSetter != null)
+                    s_RuleResultSetter.Invoke(rule, new object[] { process });
+                else if (s_RuleResultField != null)
+                    s_RuleResultField.SetValue(rule, process);
+            }
+            catch (Exception e)
+            {
+                Main.Log("FillInterceptedResult failed: " + e.Message);
+            }
+        }
+
         private static void SetExpiry(SequencerState state, UnitEntityData caster)
         {
             var now = Ids.Now();
@@ -1020,15 +1056,17 @@ namespace SpellSequencers
             if (state.Spells.Count == 0) return;
             var spells = new List<StoredSpell>(state.Spells);
             var targets = state.SlotTargets != null ? (TargetWrapper[])state.SlotTargets.Clone() : null;
-            part.States.Remove(state);
-            SyncUnit(caster, part);
+            part.States.Remove(state);   // 立即移除，避免同一帧内被再次吸收/触发
             Main.Log("manual release " + def.Key + ": " + spells.Count + " spells");
             for (int i = 0; i < spells.Count; i++)
             {
                 var t = (targets != null && i < targets.Length && targets[i] != null) ? targets[i] : target;
                 TryFire(caster, spells[i], t ?? (TargetWrapper)caster);
             }
-            caster.SpendAction(UnitCommand.CommandType.Standard, false, 0f);
+            // 移除 buff/释放能力推迟到下一帧，避免施法回调中途重建行动条。
+            // 释放能力是标准动作，命令正常结束后游戏会按 command.Type 自行扣除，这里不再手动 SpendAction，
+            // 否则会和游戏侧重复扣动作。
+            Runner.DeferToNextFrame(delegate { SyncUnit(caster, part); });
         }
 
         /// <summary>被攻击命中时，自动引爆所有已装填且已有存货的触发器。</summary>
@@ -1059,10 +1097,11 @@ namespace SpellSequencers
                 foreach (var st in fire)
                 {
                     var spells = new List<StoredSpell>(st.Spells);
-                    part.States.Remove(st);
-                    SyncUnit(defender, part);
+                    part.States.Remove(st);   // 立即移除，避免同一帧内被再次吸收/触发
                     Main.Log("auto trigger fired: " + spells.Count + " spells at " + attacker.CharacterName);
                     FireAll(defender, spells, (TargetWrapper)attacker);
+                    // 同样把行动条刷新推迟到下一帧，避免在攻击结算回调里重建 UI。
+                    Runner.DeferToNextFrame(delegate { SyncUnit(defender, part); });
                 }
             }
             finally
@@ -1190,9 +1229,17 @@ namespace SpellSequencers
 
                     // 槽位能力是「释放」能力的 variants，无需作为 fact 添加；
                     // 但槽位蓝图是全局共享的，图标/名字只对「当前选中角色」同步，避免多名队员互相覆盖。
-                    if (!def.IsTrigger && isArmed && IsSelected(unit))
+                    if (!def.IsTrigger)
                     {
-                        UpdateSlotDisplay(def, st);
+                        if (isArmed && IsSelected(unit))
+                        {
+                            UpdateSlotDisplay(def, st);
+                        }
+                        else if (!isArmed && IsSelected(unit))
+                        {
+                            // 解除待发后把全局共享的槽位蓝图复位，避免污染残留到其他角色与后续读档。
+                            ResetSlotDisplay(def);
+                        }
                     }
 
                     // 更新 buff 描述，列出已储存的法术，方便悬停查看。
@@ -1325,6 +1372,18 @@ namespace SpellSequencers
             }
         }
 
+        /// <summary>解除待发后，把该环级的全部槽位蓝图恢复到 template_slot.jbp 的默认目标元数据。
+        /// 蓝图是进程级对象，读档不会重建，必须显式复位才不会污染其他角色与后续读档；
+        /// 值未变化时 SyncSlotTargeting 会自动跳过，因此每秒调用也不会反复重写。</summary>
+        private static void ResetSlotDisplay(TierDef def)
+        {
+            for (int i = 0; i < Ids.MaxStore; i++)
+            {
+                var slotBp = ResourcesLibrary.TryGetBlueprint<BlueprintAbility>(def.SlotBps[i]);
+                if (slotBp != null) SyncSlotTargeting(slotBp, null);
+            }
+        }
+
         // 只复制影响「目标选择预览」的组件类型：
         // AbilityAoERadius 画作用范围圈（火球术），AbilityTargetsAround 画自身周围爆发，
         // AbilityDeliverProjectile 驱动锥形/线形预览（燃烧之手、闪电束）。
@@ -1336,16 +1395,57 @@ namespace SpellSequencers
             typeof(AbilityDeliverProjectile),
         };
 
+        /// <summary>槽位蓝图上一次写入的目标元数据签名，用于跳过无变化的重复写入（Runner 每秒轮询）。</summary>
+        private sealed class SlotSyncState
+        {
+            public BlueprintAbility Owner;
+            public string Key = "";
+        }
+
+        private static readonly Dictionary<string, SlotSyncState> s_SlotSync =
+            new Dictionary<string, SlotSyncState>();
+
+        /// <summary>目标元数据签名：来源法术 GUID + 预览组件类型列表。相同则说明蓝图无需重写。</summary>
+        private static string SlotSyncKey(BlueprintAbility src)
+        {
+            if (src == null) return "";
+            var sb = new StringBuilder(src.AssetGuid.ToString());
+            var comps = src.ComponentsArray;
+            if (comps != null)
+            {
+                foreach (var c in comps)
+                {
+                    if (c == null) continue;
+                    var ct = c.GetType();
+                    foreach (var pt in PreviewComponentTypes)
+                    {
+                        if (pt.IsAssignableFrom(ct)) { sb.Append('|').Append(ct.FullName); break; }
+                    }
+                }
+            }
+            return sb.ToString();
+        }
+
         /// <summary>
         /// 把槽位蓝图的目标元数据（距离/可目标类型/AoE 预览组件）同步为储存法术的值；
         /// src 为 null 时恢复 template_slot.jbp 的默认值。
         /// 注意：不复制 Type/ActionType/SpellResistance 等——槽位仍保持自由动作特殊能力，
         /// 只影响目标选择 UI 的显示，不改变槽位施放行为。
+        /// 值未变化（同一来源法术、同一预览组件集合）时直接返回，避免每秒重写全局蓝图并重新克隆组件。
         /// </summary>
         private static void SyncSlotTargeting(BlueprintAbility slotBp, BlueprintAbility src)
         {
             try
             {
+                string key = SlotSyncKey(src);
+                string id = slotBp.AssetGuid.ToString();
+                SlotSyncState prev;
+                if (s_SlotSync.TryGetValue(id, out prev) && prev != null
+                    && ReferenceEquals(prev.Owner, slotBp) && prev.Key == key)
+                {
+                    return;
+                }
+
                 if (src != null)
                 {
                     slotBp.Range = src.Range;
@@ -1368,6 +1468,7 @@ namespace SpellSequencers
                     slotBp.CanTargetSelf = true;
                     slotBp.ComponentsArray = new BlueprintComponent[0];
                 }
+                s_SlotSync[id] = new SlotSyncState { Owner = slotBp, Key = key };
             }
             catch (Exception e)
             {
@@ -1535,6 +1636,33 @@ namespace SpellSequencers
         private float _bootTimer = 0f;
         private bool _delayedListsDone;
 
+        private static readonly List<Action> s_Deferred = new List<Action>();
+        private static readonly List<Action> s_DeferredBuffer = new List<Action>();
+
+        /// <summary>把会改动行动条/动作经济的操作推迟到下一次 Unity 帧执行，
+        /// 避免在 RuleCastSpell / RuleAttackRoll 回调中途重建行动条、销毁变体弹窗。</summary>
+        public static void DeferToNextFrame(Action action)
+        {
+            if (action == null) return;
+            lock (s_Deferred) s_Deferred.Add(action);
+        }
+
+        private static void FlushDeferred()
+        {
+            lock (s_Deferred)
+            {
+                if (s_Deferred.Count == 0) return;
+                s_DeferredBuffer.AddRange(s_Deferred);
+                s_Deferred.Clear();
+            }
+            foreach (var a in s_DeferredBuffer)
+            {
+                try { a(); }
+                catch (Exception e) { Main.Log("deferred action failed: " + e.Message); }
+            }
+            s_DeferredBuffer.Clear();
+        }
+
         public static void Create()
         {
             try
@@ -1552,6 +1680,7 @@ namespace SpellSequencers
 
         private void Update()
         {
+            FlushDeferred();
             _acc += Time.unscaledDeltaTime;
             if (_acc < 1f) return;
             _acc = 0f;
@@ -1620,7 +1749,10 @@ namespace SpellSequencers
         {
             try
             {
-                return SequencerLogic.Handle(__instance);
+                bool runOriginal = SequencerLogic.Handle(__instance);
+                // 拦截路径必须补上 Result，否则 UnitUseAbility.OnAction 会空引用并触发 InterruptAll。
+                if (!runOriginal) SequencerLogic.FillInterceptedResult(__instance);
+                return runOriginal;
             }
             catch (Exception e)
             {
