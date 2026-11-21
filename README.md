@@ -86,9 +86,11 @@ level so they stay useful before the late-game one-shot meta.
 pwsh -ExecutionPolicy Bypass -File build.ps1 -NoPause
 ```
 
-- 日志默认关闭。在游戏根目录（与 exe 同级）新建一个空文件 `SpellSequencers.debug`，
-  或放在 `Mods\SpellSequencers\debug.flag`，日志就会写到游戏根目录的 `SpellSequencers.log`；
-  删掉文件即关闭（每 2 秒复查一次，无需重启游戏）。
+- 日志默认关闭，请打开 **UMM → Mods → Spell Sequencers (BG2-style) → 设置面板**，
+  勾选「启用详细日志（调试用）」。开启后日志写入 `Mods\SpellSequencers\SpellSequencers.log`，
+  **切换后立即生效，无需重启**；设置本身保存在同目录的 `Settings.xml` 里。
+  旧的空文件开关（游戏根目录 `SpellSequencers.debug`、`Mods\SpellSequencers\debug.flag`）**已移除**，
+  放了也不会再产生日志。日志为追加写入，超过 4 MB 时会在下次启动时重建。
 - 编译产物：`SpellSequencers.dll`、`SpellSequencers-UMM.zip`，并自动复制到游戏的 `Mods\SpellSequencers\`。
 
 ---
@@ -186,9 +188,13 @@ Requires PowerShell 7 and .NET (to run the bundled Roslyn compiler). Set `$gameD
 pwsh -ExecutionPolicy Bypass -File build.ps1 -NoPause
 ```
 
-- Logging is off by default. Create an empty file named `SpellSequencers.debug` in the game root
-  (next to the exe) or `Mods\SpellSequencers\debug.flag`; logs then go to `SpellSequencers.log` in
-  the game root. Delete the file to turn it off (re-checked every 2 seconds, no restart needed).
+- Logging is off by default. Open **UMM → Mods → Spell Sequencers (BG2-style) → settings panel**
+  and tick *Enable verbose log (for debugging)*. The log is written to
+  `Mods\SpellSequencers\SpellSequencers.log`, and **takes effect immediately — no restart needed**.
+  The setting is persisted in `Settings.xml` in the same folder.
+  The old empty-file switches (game-root `SpellSequencers.debug`,
+  `Mods\SpellSequencers\debug.flag`) have been **removed** and no longer produce a log.
+  The log is appended to; once it exceeds 4 MB it is recreated on the next start.
 - Outputs `SpellSequencers.dll` and `SpellSequencers-UMM.zip`, and also copies them into the game's
   `Mods\SpellSequencers\`.
 

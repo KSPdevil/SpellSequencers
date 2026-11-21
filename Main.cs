@@ -28,6 +28,8 @@ using Kingmaker.UnitLogic.Commands;
 using Kingmaker.UnitLogic.Commands.Base;
 using Kingmaker.Utility;
 using Newtonsoft.Json;
+using UnityModManagerNet;
+using static UnityModManagerNet.UnityModManager;
 using UnityEngine;
 
 namespace SpellSequencers
@@ -41,52 +43,96 @@ namespace SpellSequencers
 
     public class Main
     {
-        public static void Load()
+        /// <summary>UMM 的入口对象（保存设置、取 mod 目录用）。</summary>
+        public static ModEntry Mod;
+
+        /// <summary>UMM 设置面板里的持久化设置（写入 Mods\SpellSequencers\Settings.xml）。</summary>
+        public static Settings Config;
+
+        /// <summary>mod 自己的目录（UMM 提供，末尾带分隔符），日志写在这里。</summary>
+        public static string ModPath = "";
+
+        public static bool Load(ModEntry modEntry)
         {
+            Mod = modEntry;
+            ModPath = modEntry != null ? modEntry.Path : "";
+            try { Config = ModSettings.Load<Settings>(modEntry); }
+            catch { Config = null; }
+            if (Config == null) Config = new Settings();
+
+            if (modEntry != null)
+            {
+                modEntry.OnGUI = OnGUI;
+                modEntry.OnSaveGUI = OnSaveGUI;
+            }
+
             try
             {
                 var harmony = new Harmony("com.custom.spellsequencers");
                 harmony.PatchAll(Assembly.GetExecutingAssembly());
                 Runner.Create();
                 Log("=== SpellSequencers loaded ===");
+                Log("log file: " + LogPath);
+                return true;
             }
             catch (Exception e)
             {
                 Log("FATAL: " + e);
+                try { if (modEntry != null) modEntry.Logger.Log("FATAL: " + e); } catch { }
+                return false;
             }
         }
 
+        /// <summary>UMM 设置面板：日志默认关闭，勾选后立即生效（无需重启）。</summary>
+        private static void OnGUI(ModEntry modEntry)
+        {
+            bool zh = LocalizationManager.CurrentLocale == Locale.zhCN;
+            if (Config == null) Config = new Settings();
+
+            GUILayout.BeginVertical();
+            GUILayout.Label(zh
+                ? "详细日志默认关闭。开启后写入 <Mods\\SpellSequencers\\SpellSequencers.log>，切换后立即生效。"
+                : "Verbose log is off by default. When enabled it is written to <Mods\\SpellSequencers\\SpellSequencers.log>; changes take effect immediately.");
+            bool enabled = GUILayout.Toggle(Config.EnableLog,
+                zh ? "启用详细日志（调试用）" : "Enable verbose log (for debugging)");
+            if (enabled != Config.EnableLog)
+            {
+                Config.EnableLog = enabled;
+                try { Config.Save(modEntry); } catch { }
+            }
+            GUILayout.Label(zh
+                ? "当前状态：" + (Config.EnableLog ? "已开启" : "已关闭")
+                : "Current state: " + (Config.EnableLog ? "ON" : "OFF"));
+            GUILayout.EndVertical();
+        }
+
+        private static void OnSaveGUI(ModEntry modEntry)
+        {
+            try { if (Config != null) Config.Save(modEntry); } catch { }
+        }
+
         private static bool s_LogChecked;
-        private static int s_LogEnabled = -1;
-        private static long s_LogNextCheck;
 
         /// <summary>
-        /// 日志开关：只要在游戏根目录（和 exe 同级）放一个名为 SpellSequencers.debug 的空文件，
-        /// 或放在 Mods\SpellSequencers\debug.flag，日志就会写到游戏根目录的 SpellSequencers.log。
-        /// 删掉文件即关闭。每 2 秒复查一次，不用重启游戏。
+        /// 日志开关来自 UMM 设置面板（默认关闭）。旧的文件开关
+        /// （游戏根目录 SpellSequencers.debug / Mods\SpellSequencers\debug.flag）已移除。
         /// </summary>
         private static bool LogEnabled
         {
+            get { return Config != null && Config.EnableLog; }
+        }
+
+        private static string LogPath
+        {
             get
             {
-                long now = DateTime.UtcNow.Ticks;
-                if (s_LogEnabled < 0 || now >= s_LogNextCheck)
+                string dir = ModPath;
+                if (string.IsNullOrEmpty(dir))
                 {
-                    s_LogNextCheck = now + TimeSpan.TicksPerSecond * 2;
-                    int enabled = 0;
-                    try
-                    {
-                        string root = AppDomain.CurrentDomain.BaseDirectory;
-                        if (File.Exists(Path.Combine(root, "SpellSequencers.debug"))
-                            || File.Exists(Path.Combine(root, "Mods\\SpellSequencers\\debug.flag")))
-                        {
-                            enabled = 1;
-                        }
-                    }
-                    catch { }
-                    s_LogEnabled = enabled;
+                    dir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Mods", "SpellSequencers");
                 }
-                return s_LogEnabled == 1;
+                try { Directory.CreateDirectory(dir); } catch { }
+                return Path.Combine(dir, "SpellSequencers.log");
             }
         }
 
@@ -95,7 +141,7 @@ namespace SpellSequencers
             if (!LogEnabled) return;
             try
             {
-                string logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "SpellSequencers.log");
+                string logPath = LogPath;
                 if (!s_LogChecked)
                 {
                     s_LogChecked = true;
@@ -105,6 +151,21 @@ namespace SpellSequencers
                 File.AppendAllText(logPath, DateTime.Now.ToString("HH:mm:ss.fff") + " " + message + Environment.NewLine);
             }
             catch { }
+        }
+    }
+
+    // =========================================================================
+    //  UMM 设置（Settings.xml 持久化）
+    // =========================================================================
+
+    public class Settings : ModSettings
+    {
+        /// <summary>是否把详细日志写入 Mods\SpellSequencers\SpellSequencers.log（默认关闭）。</summary>
+        public bool EnableLog;
+
+        public override void Save(ModEntry modEntry)
+        {
+            ModSettings.Save<Settings>(this, modEntry);
         }
     }
 

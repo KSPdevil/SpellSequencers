@@ -6,6 +6,7 @@ SpellSequencers-UMM.zip
 SpellSequencers.log
 SpellSequencers.debug
 debug.flag
+Settings.xml
 
 # 构建中间目录
 obj/

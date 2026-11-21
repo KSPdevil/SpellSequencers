@@ -63,8 +63,13 @@ if (-not $compiler) {
 
 # ---------------------------------------------------------------- build response file
 $exclude = @('netstandard.dll', 'UnityEngine.dll')
-$refs = Get-ChildItem -Path $managed -Filter '*.dll' |
-        Where-Object { $exclude -notcontains $_.Name -and $_.Name -notlike 'System.Private.*' }
+$refs = @(Get-ChildItem -Path $managed -Filter '*.dll' |
+        Where-Object { $exclude -notcontains $_.Name -and $_.Name -notlike 'System.Private.*' })
+
+# UnityModManager.dll 在 Managed\UnityModManager\ 子目录，设置面板 API 需要引用它
+$ummDll = Join-Path $managed 'UnityModManager\UnityModManager.dll'
+if (Test-Path $ummDll) { $refs += Get-Item $ummDll }
+else { Say "WARNING: UnityModManager.dll not found: $ummDll" 'Yellow' }
 
 $rsp = Join-Path $env:TEMP 'seq-build.rsp'
 $lines = New-Object System.Collections.Generic.List[string]
