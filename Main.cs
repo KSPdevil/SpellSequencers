@@ -20,6 +20,7 @@ using Kingmaker.Settings;
 using Kingmaker.UnitLogic;
 using Kingmaker.UnitLogic.Abilities;
 using Kingmaker.UnitLogic.Abilities.Blueprints;
+using Kingmaker.UnitLogic.Abilities.Components;
 using Kingmaker.UnitLogic.Buffs;
 using Kingmaker.UnitLogic.Buffs.Blueprints;
 using Kingmaker.UnitLogic.Commands;
@@ -1305,6 +1306,9 @@ namespace SpellSequencers
                                 name = name + " → " + tname;
                             }
                             if (pack != null) pack.PutString(def.SlotNameKeys[i], name);
+                            // 把储存法术的施法距离/目标限制/AoE 预览组件同步到槽位蓝图上，
+                            // 让点槽位选目标时显示和普通施法一样的距离圈和范围圈。
+                            SyncSlotTargeting(slotBp, storedBp);
                             continue;
                         }
                     }
@@ -1312,12 +1316,97 @@ namespace SpellSequencers
                     var relBp = ResourcesLibrary.TryGetBlueprint<BlueprintAbility>(def.ReleaseBp);
                     if (relBp != null) SetBlueprintIcon(slotBp, relBp);
                     if (pack != null) pack.PutString(def.SlotNameKeys[i], zh ? ("空槽位 " + (i + 1)) : ("Empty Slot " + (i + 1)));
+                    SyncSlotTargeting(slotBp, null);
                 }
             }
             catch (Exception e)
             {
                 Main.Log("UpdateSlotDisplay failed: " + e.Message);
             }
+        }
+
+        // 只复制影响「目标选择预览」的组件类型：
+        // AbilityAoERadius 画作用范围圈（火球术），AbilityTargetsAround 画自身周围爆发，
+        // AbilityDeliverProjectile 驱动锥形/线形预览（燃烧之手、闪电束）。
+        private static readonly Type[] PreviewComponentTypes =
+        {
+            typeof(AbilityAoERadius),
+            typeof(AbilityTargetsAround),
+            typeof(AbilityTargetsAroundOnGrid),
+            typeof(AbilityDeliverProjectile),
+        };
+
+        /// <summary>
+        /// 把槽位蓝图的目标元数据（距离/可目标类型/AoE 预览组件）同步为储存法术的值；
+        /// src 为 null 时恢复 template_slot.jbp 的默认值。
+        /// 注意：不复制 Type/ActionType/SpellResistance 等——槽位仍保持自由动作特殊能力，
+        /// 只影响目标选择 UI 的显示，不改变槽位施放行为。
+        /// </summary>
+        private static void SyncSlotTargeting(BlueprintAbility slotBp, BlueprintAbility src)
+        {
+            try
+            {
+                if (src != null)
+                {
+                    slotBp.Range = src.Range;
+                    slotBp.CustomRange = src.CustomRange;
+                    slotBp.IgnoreMinimalRangeLimit = src.IgnoreMinimalRangeLimit;
+                    slotBp.CanTargetPoint = src.CanTargetPoint;
+                    slotBp.CanTargetEnemies = src.CanTargetEnemies;
+                    slotBp.CanTargetFriends = src.CanTargetFriends;
+                    slotBp.CanTargetSelf = src.CanTargetSelf;
+                    slotBp.ComponentsArray = ClonePreviewComponents(src, slotBp);
+                }
+                else
+                {
+                    slotBp.Range = AbilityRange.Medium;
+                    slotBp.CustomRange = default(Feet);
+                    slotBp.IgnoreMinimalRangeLimit = false;
+                    slotBp.CanTargetPoint = true;
+                    slotBp.CanTargetEnemies = true;
+                    slotBp.CanTargetFriends = true;
+                    slotBp.CanTargetSelf = true;
+                    slotBp.ComponentsArray = new BlueprintComponent[0];
+                }
+            }
+            catch (Exception e)
+            {
+                Main.Log("SyncSlotTargeting failed: " + e.Message);
+            }
+        }
+
+        /// <summary>从源法术蓝图克隆预览相关组件（避免两个蓝图共享同一组件实例）。</summary>
+        private static BlueprintComponent[] ClonePreviewComponents(BlueprintAbility src, BlueprintAbility owner)
+        {
+            List<BlueprintComponent> result = null;
+            var comps = src.ComponentsArray;
+            if (comps != null)
+            {
+                foreach (var c in comps)
+                {
+                    if (c == null) continue;
+                    var ct = c.GetType();
+                    bool want = false;
+                    foreach (var pt in PreviewComponentTypes)
+                    {
+                        if (pt.IsAssignableFrom(ct)) { want = true; break; }
+                    }
+                    if (!want) continue;
+                    try
+                    {
+                        var clone = (BlueprintComponent)Activator.CreateInstance(ct);
+                        foreach (var f in ct.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance))
+                        {
+                            try { f.SetValue(clone, f.GetValue(c)); } catch { }
+                        }
+                        clone.OwnerBlueprint = owner;
+                        if (result == null) result = new List<BlueprintComponent>();
+                        result.Add(clone);
+                    }
+                    catch { }
+                }
+            }
+            return result != null ? result.ToArray() : new BlueprintComponent[0];
         }
 
         private static string LocTitle(TierDef d, bool zh)
